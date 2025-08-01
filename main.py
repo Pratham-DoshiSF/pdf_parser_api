@@ -1,47 +1,44 @@
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
-import uvicorn
-import uuid
-from markitdown import MarkItDown
+from flask import Flask, request, jsonify
 import os
 import shutil
 import tempfile
+import uuid
+from markitdown import MarkItDown
 
-app = FastAPI()
+app = Flask(__name__)
 md = MarkItDown(enable_plugins=True)
 
+@app.route("/pdf_to_markdown", methods=["POST"])
+def pdf_conversion():
+    if 'pdf_file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
 
-@app.post("/pdf_to_markdown")
-async def pdf_conversion(pdf_file: UploadFile = File(...)):
-    # Create a temporary file
-    suffix = os.path.splitext(pdf_file.filename)[
-        1
-    ]  # keep the original pdf_file extension
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        pdf_path = tmp.name
-        # Save the uploaded pdf_file to the temp location
-        pdf_dir = os.path.join("te" "mp", str(uuid.uuid4()))
-        os.makedirs(pdf_dir, exist_ok=True)
-        pdf_path = os.path.join(pdf_dir, pdf_path)
-        with open(pdf_path, "wb") as buffer:
-            shutil.copyfileobj(pdf_file.file, buffer)
+    pdf_file = request.files['pdf_file']
+    if pdf_file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    suffix = os.path.splitext(pdf_file.filename)[1]
+    pdf_dir = os.path.join("temp", str(uuid.uuid4()))
+    os.makedirs(pdf_dir, exist_ok=True)
+    pdf_path = os.path.join(pdf_dir, f"upload{suffix}")
 
     try:
-        # Now pass the file path to markitdown
+        # Save the file to disk
+        pdf_file.save(pdf_path)
+
+        # Convert to markdown
         result = md.convert(pdf_path)
 
-        return JSONResponse(
-            content={
-                "filename": pdf_file.filename,
-                "content_type": pdf_file.content_type,
-                "content": result.text_content,
-            }
-        )
+        return jsonify({
+            "filename": pdf_file.filename,
+            "content_type": pdf_file.content_type,
+            "content": result.text_content,
+        })
+
     finally:
-        # Optional: delete the temp file
+        # Clean up temp directory
         if os.path.exists(pdf_dir):
             shutil.rmtree(pdf_dir)
 
-
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+    app.run(host="0.0.0.0", port=8000)
