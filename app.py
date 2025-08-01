@@ -18,7 +18,7 @@ def pdf_conversion():
         return jsonify({"error": "No selected file"}), 400
 
     suffix = os.path.splitext(pdf_file.filename)[1]
-    pdf_dir = os.path.join("temp", str(uuid.uuid4()))
+    pdf_dir = os.path.join("/tmp/", str(uuid.uuid4()))
     os.makedirs(pdf_dir, exist_ok=True)
     pdf_path = os.path.join(pdf_dir, f"upload{suffix}")
 
